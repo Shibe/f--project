@@ -1,0 +1,27 @@
+open System;
+
+type expr = 
+    | CstI of int
+    | Var of string
+    | Let of string * expr * expr
+    | Prim of string * expr * expr
+
+let env = [("a", 3); ("c", 78); ("asdf", 6); ("b", 1)];;
+
+let rec lookup env x = 
+    match env with
+        | []        -> failwith (" not found")
+        | (y, v)::r -> if x=y then v else lookup r x;;
+
+let rec eval (e : expr) : int = 
+    match e with
+        | CstI i            -> i
+        | Var x             -> lookup env x
+        | Prim("+", e1, e2) -> eval e1 + eval e2
+        | Prim("*", e1, e2) -> eval e1 * eval e2
+        | Prim("-", e1, e2) -> eval e1 - eval e2
+        | Prim _            -> failwith "unknown primitive";;  
+ 
+ eval(Prim("+", Var "c", CstI 10)) |> Console.WriteLine;
+
+ let shit = Console.ReadLine();
