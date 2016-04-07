@@ -1,0 +1,122 @@
+module Interpreter
+
+open System
+
+type Then = Then
+type Else = Else
+
+type Var = 
+    | Int of int
+    | Float of float
+    | Double of double
+    | String of string
+    | Boolean of bool
+    | Lookup of string
+    | Addition of Var * Var
+    | Subtraction of Var * Var
+    | Multiplication of Var * Var
+    | Division of Var * Var
+    | Power of Var * Var
+    | Equals of Var * Var
+
+type State =
+    { Variables : Map<string,Var>;
+      Calls : int
+    }
+
+type Func =
+    | Seq of Func * Func
+    | Let of string * Var
+    | Print of Var
+    | If of Var * Func * Func
+
+let rec eval (v : Var) (state : State) : Var = 
+    match v with
+        | Lookup l -> state.Variables.Item(l)
+        | Int i -> Int i
+        | Float f -> Float f
+        | Double d -> Double d
+        | String s -> String s
+        | Boolean b -> Boolean b
+        | Addition (x,y) ->
+            match eval x state, eval y state with
+            | Int f, Int s -> Int (f + s)
+            | Float f, Float s -> Float (f + s)
+            | Double f, Double s -> Double  (f + s)
+            | String f, String s -> String (f + s)
+            | _, _ -> failwith "This variable type does not support aditions"
+        | Subtraction (x,y) ->
+            match eval x state, eval y state with
+            | Int f, Int s -> Int (f - s)
+            | Float f, Float s -> Float (f - s)
+            | Double f, Double s -> Double (f - s)
+            | String f, String s ->
+                let index = f.IndexOf s
+                if index >= 0 then String (f.Substring(index)) else x
+            | _, _ -> failwith "This variable type does not support substractions"
+        | Multiplication (x,y) ->
+            match eval x state, eval y state with
+            | Int f, Int s -> Int (f * s)
+            | Float f, Float s -> Float (f * s)
+            | Double f, Double s -> Double  (f * s)
+            | _, _ -> failwith "This variable type does not support multiplications"
+        | Division (x,y) -> 
+            match eval x state, eval y state with
+            | Int f, Int s -> Int (f / s)
+            | Float f, Float s -> Float (f / s)
+            | Double f, Double s -> Double  (f / s)
+            | _, _ -> failwith "This variable type does not support divisions"
+        | Power (x,y) ->
+            match eval x state, eval y state with
+            | Int f, Int s -> Int (int (Math.Pow (float f, float s)))
+            | Float f, Float s -> Float (Math.Pow(f, s))
+            | Double f, Double s -> Double (Math.Pow(f, s))
+            | _, _ -> failwith "This variable type does not support power"
+        | Equals (x,y) -> Boolean ((eval x state) = (eval y state))
+           
+let rec invoke (f : Func) (state : State) =
+    match f with
+    | Seq (one, two) -> invoke(one) { state with Calls = state.Calls + 1 } |> invoke(two)
+    | Let (name,value) -> { state with Variables = state.Variables.Add (name , eval value state) }
+    | Print x ->
+        printfn "%A" (eval x state)
+        state
+    | If (c,t,f) ->
+        match eval c state with
+        | Boolean true -> invoke t state
+        | _ -> invoke f state
+
+let (|=) name value = Let(name,value)    
+let (!) name = Lookup name
+let (>>) one two = Seq (one, two)
+
+let (|+) x y = Addition (x, y)
+let (|-) x y = Subtraction (x, y)
+let (|*) x y = Multiplication (x, y)
+let (|/) x y = Division (x, y)
+let (|^) x y = Power (x, y)
+let (|==) x y = Equals (x, y)
+
+
+let If cond (_ :Then) t (_:Else) f = If(cond,t,f)
+
+(* Program start *)
+
+let z =
+    (
+    "x" |= (Int 5) >>
+    ("bert" |= ((Int 5) |^ (Int 2))) >>
+    Print (!"bert") >>
+    ("y" |= (Int 5)) >>
+    ("z" |= (!"x" |+ !"y" |+ (Int 69))) >>
+    Print(!"z") >>
+    If (!"x" |== !"y") Then 
+        (Print(String "They be the same")) 
+        Else 
+        (Print(String "They be different"))
+    )
+
+
+invoke (z) { Variables = Map.empty; Calls = 0 } |> ignore
+
+Console.ReadLine() |> ignore
